@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نهر الفقاعات الرقمية · Digital Bubbles River</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
+body {
+  background: #060e1f;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+#wrapper {
+  width: 100%; max-width: 700px;
+  background: #0a1628;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+#header-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: #0d1e38;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+#title-tag {
+  font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.8);
+  display: flex; align-items: center; gap: 8px;
+}
+#title-tag .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e; animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+#score-display { display: flex; gap: 12px; margin-left: auto; align-items: center; }
+.score-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; color: #fff;
+}
+.score-chip.correct { background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.4); }
+.score-chip.wrong   { background: rgba(239,68,68,0.2);  border: 1px solid rgba(239,68,68,0.4); }
+#lives { display: flex; gap: 3px; }
+.heart { font-size: 16px; transition: opacity 0.3s; }
+.heart.lost { opacity: 0.15; filter: grayscale(1); }
+
+#river-canvas {
+  position: relative; width: 100%; height: 340px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0d2147 0%, #0a1628 100%);
+}
+.river-line { position:absolute; left:0; right:0; height:1px; background:rgba(255,255,255,0.04); }
+
+#zones {
+  display: flex; gap: 8px; padding: 12px;
+  background: #0d1e38;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.zone {
+  flex: 1; border-radius: 12px; min-height: 88px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  border: 2px dashed; transition: background 0.2s, border-style 0.15s, transform 0.15s;
+  position: relative;
+}
+.zone.highlight { border-style: solid; transform: scale(1.04); }
+.zone-safe    { border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.05); }
+.zone-safe.highlight    { background: rgba(34,197,94,0.16); border-color: #22c55e; }
+.zone-suspect { border-color: rgba(251,146,60,0.45); background: rgba(251,146,60,0.05); }
+.zone-suspect.highlight { background: rgba(251,146,60,0.16); border-color: #fb923c; }
+.zone-danger  { border-color: rgba(239,68,68,0.45);  background: rgba(239,68,68,0.05); }
+.zone-danger.highlight  { background: rgba(239,68,68,0.16);  border-color: #ef4444; }
+.zone-icon  { font-size: 24px; }
+.zone-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: center; line-height: 1.4; }
+.zone-count { position: absolute; top: 6px; right: 9px; font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 600; }
+
+.bubble {
+  position: absolute; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: grab; padding: 8px; text-align: center;
+  transition: box-shadow 0.15s, transform 0.15s;
+  touch-action: none;
+}
+.bubble:hover { transform: scale(1.09); }
+.bubble.dragging { cursor: grabbing; z-index: 100; transform: scale(1.13); box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+.bubble .b-icon { font-size: 20px; line-height: 1; }
+.bubble .b-text { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.92); max-width: 70px; margin-top: 3px; line-height: 1.25; }
+.bubble-safe    { background: radial-gradient(circle at 35% 35%, rgba(34,197,94,0.38), rgba(34,197,94,0.1));  border: 1.5px solid rgba(34,197,94,0.65);  box-shadow: 0 0 14px rgba(34,197,94,0.22); }
+.bubble-suspect { background: radial-gradient(circle at 35% 35%, rgba(251,146,60,0.38), rgba(251,146,60,0.1)); border: 1.5px solid rgba(251,146,60,0.65); box-shadow: 0 0 14px rgba(251,146,60,0.22); }
+.bubble-danger  { background: radial-gradient(circle at 35% 35%, rgba(239,68,68,0.38),  rgba(239,68,68,0.1));  border: 1.5px solid rgba(239,68,68,0.65);  box-shadow: 0 0 14px rgba(239,68,68,0.22); }
+
+.pop-msg {
+  position: absolute; pointer-events: none; z-index: 200;
+  font-size: 13px; font-weight: 700; padding: 5px 14px;
+  border-radius: 20px; white-space: nowrap;
+  animation: popUp 1.7s ease forwards;
+}
+@keyframes popUp { 0%{opacity:0;transform:translateY(0)} 15%{opacity:1} 70%{opacity:1;transform:translateY(-36px)} 100%{opacity:0;transform:translateY(-54px)} }
+
+#freeze-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  background: rgba(8,16,34,0.82);
+  display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px;
+}
+#freeze-overlay.active { display: flex; }
+#freeze-icon { font-size: 36px; }
+#freeze-text { font-size: 14px; font-weight: 600; color: #fff; margin-top: 6px; max-width: 280px; text-align: center; line-height: 1.5; }
+#freeze-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+
+#end-screen {
+  display: none; position: absolute; inset: 0; z-index: 150;
+  background: rgba(8,16,34,0.97);
+  align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+}
+#end-screen.active { display: flex; }
+#end-trophy { font-size: 52px; }
+#end-score-big { font-size: 36px; font-weight: 700; color: #fff; }
+#end-label { font-size: 14px; color: rgba(255,255,255,0.5); }
+#restart-btn {
+  margin-top: 10px; padding: 11px 28px; cursor: pointer;
+  background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff;
+  transition: background 0.15s;
+}
+#restart-btn:hover { background: rgba(255,255,255,0.18); }
+
+#instructions {
+  padding: 10px 16px 12px;
+  background: #0a1628;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+}
+.inst { font-size: 11px; color: rgba(255,255,255,0.35); display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="header-bar">
+    <div id="title-tag">
+      <div class="dot"></div>
+      نهر الفقاعات الرقمية &nbsp;·&nbsp; Digital Bubbles River
+    </div>
+    <div id="score-display">
+      <div class="score-chip correct">✓ <span id="correct-count">0</span></div>
+      <div class="score-chip wrong">✗ <span id="wrong-count">0</span></div>
+      <div id="lives">
+        <span class="heart" id="h3">❤️</span>
+        <span class="heart" id="h2">❤️</span>
+        <span class="heart" id="h1">❤️</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="river-canvas">
+    <div class="river-line" style="top:25%"></div>
+    <div class="river-line" style="top:50%"></div>
+    <div class="river-line" style="top:75%"></div>
+    <div id="freeze-overlay">
+      <div id="freeze-icon"></div>
+      <div id="freeze-text"></div>
+      <div id="freeze-sub">يستأنف النهر خلال <span id="countdown">3</span> ثوانٍ…</div>
+    </div>
+    <div id="end-screen">
+      <div id="end-trophy"></div>
+      <div id="end-score-big"></div>
+      <div id="end-label"></div>
+      <button id="restart-btn" onclick="initGame()">العب مجدداً ↻  Play again</button>
+    </div>
+  </div>
+
+  <div id="zones">
+    <div class="zone zone-safe" id="zone-safe">
+      <span class="zone-icon">🛡️</span>
+      <span class="zone-label">آمِن<br>Safe</span>
+      <span class="zone-count" id="cnt-safe">0</span>
+    </div>
+    <div class="zone zone-suspect" id="zone-suspect">
+      <span class="zone-icon">⚠️</span>
+      <span class="zone-label">مشبوه<br>Suspicious</span>
+      <span class="zone-count" id="cnt-suspect">0</span>
+    </div>
+    <div class="zone zone-danger" id="zone-danger">
+      <span class="zone-icon">🚨</span>
+      <span class="zone-label">خطر<br>Danger</span>
+      <span class="zone-count" id="cnt-danger">0</span>
+    </div>
+  </div>
+
+  <div id="instructions">
+    <span class="inst">🖱️ Drag bubbles to the correct zone</span>
+    <span class="inst">·</span>
+    <span class="inst">اسحب الفقاعات إلى المنطقة الصحيحة</span>
+    <span class="inst">·</span>
+    <span class="inst">🏆 Score 10 to win</span>
+  </div>
+</div>
+
+<script>
+const BUBBLES_DATA = [
+  { id:'b1',  text:'Trusted website',       ar:'موقع موثوق',                    type:'safe',    icon:'🌐' },
+  { id:'b2',  text:'Strong password',        ar:'كلمة مرور قوية',                type:'safe',    icon:'🔑' },
+  { id:'b3',  text:'Verified app store',     ar:'متجر تطبيقات رسمي',             type:'safe',    icon:'✅' },
+  { id:'b4',  text:'Family photo share',     ar:'مشاركة صور مع العائلة',         type:'safe',    icon:'📸' },
+  { id:'b5',  text:'Official bank email',    ar:'بريد رسمي من البنك',            type:'safe',    icon:'🏦' },
+  { id:'b6',  text:'Antivirus running',      ar:'برنامج حماية مُفعَّل',          type:'safe',    icon:'🛡️' },
+  { id:'b7',  text:'"Win a prize!" link',    ar:'رابط: اربح جائزة!',             type:'suspect', icon:'🎁' },
+  { id:'b8',  text:'Unknown app install',    ar:'تثبيت تطبيق مجهول',             type:'suspect', icon:'📦' },
+  { id:'b9',  text:'Stranger asks your name',ar:'غريب يسأل عن اسمك',             type:'suspect', icon:'👤' },
+  { id:'b10', text:'Pop-up: click here!',    ar:'نافذة منبثقة: اضغط هنا!',      type:'suspect', icon:'🖱️' },
+  { id:'b11', text:'Free WiFi, no password', ar:'واي فاي مفتوح بدون كلمة مرور', type:'suspect', icon:'📶' },
+  { id:'b12', text:'Share home address',     ar:'مشاركة عنوان المنزل',           type:'danger',  icon:'🏠' },
+  { id:'b13', text:'Password "12345"',       ar:'كلمة مرور ١٢٣٤٥',              type:'danger',  icon:'🔓' },
+  { id:'b14', text:'Send bank card photo',   ar:'إرسال صورة البطاقة البنكية',   type:'danger',  icon:'💳' },
+  { id:'b15', text:'Cyberbullying message',  ar:'رسالة تنمر إلكتروني',           type:'danger',  icon:'😡' },
+  { id:'b16', text:'Share your password',    ar:'مشاركة كلمة مرورك',             type:'danger',  icon:'⛔' },
+];
+
+const FREEZE_MSGS = {
+  safe:    { icon:'🛡️', text:'هذا المحتوى آمِن! دائماً تحقق من المصدر قبل الثقة بأي محتوى رقمي.\nThis content is safe! Always verify the source before trusting digital content.' },
+  suspect: { icon:'⚠️', text:'محتوى مشبوه! لا تتصرف بناءً على نوافذ منبثقة أو طلبات من جهات مجهولة.\nSuspicious! Don\'t act on pop-ups or requests from unknown sources.' },
+  danger:  { icon:'🚨', text:'خطر جداً! لا تشارك أبداً معلوماتك الشخصية كالعناوين وكلمات المرور.\nVery dangerous! Never share personal info like passwords or addresses online.' },
+};
+
+let state = {};
+const canvas = document.getElementById('river-canvas');
+
+function initGame() {
+  Object.assign(state, {
+    correct: 0, wrong: 0, lives: 3, frozen: false,
+    active: {}, zoneCounts: {safe:0, suspect:0, danger:0},
+    pool: [...BUBBLES_DATA].sort(() => Math.random() - 0.5),
+    spawnTimer: null, moveTimer: null
+  });
+  canvas.querySelectorAll('.bubble').forEach(b => b.remove());
+  canvas.querySelectorAll('.pop-msg').forEach(p => p.remove());
+  document.getElementById('correct-count').textContent = '0';
+  document.getElementById('wrong-count').textContent = '0';
+  [1,2,3].forEach(i => { document.getElementById('h'+i).className = 'heart'; });
+  ['safe','suspect','danger'].forEach(z => { document.getElementById('cnt-'+z).textContent = '0'; });
+  document.getElementById('end-screen').classList.remove('active');
+  document.getElementById('freeze-overlay').classList.remove('active');
+  clearInterval(state.spawnTimer);
+  clearInterval(state.moveTimer);
+  spawnBubble(); spawnBubble();
+  state.spawnTimer = setInterval(() => { if (Object.keys(state.active).length < 5) spawnBubble(); }, 2600);
+  state.moveTimer  = setInterval(moveBubbles, 38);
+}
+
+function spawnBubble() {
+  if (!state.pool.length) state.pool = [...BUBBLES_DATA].sort(() => Math.random() - 0.5);
+  const data = state.pool.pop();
+  const size  = 82 + Math.floor(Math.random() * 22);
+  const yMax  = canvas.offsetHeight - size - 10;
+  const y     = 10 + Math.floor(Math.random() * yMax);
+  const speed = 0.38 + Math.random() * 0.42;
+  const b = document.createElement('div');
+  b.className = `bubble bubble-${data.type}`;
+  b.id = 'bbl_' + data.id + '_' + Date.now();
+  b.style.width = b.style.height = size + 'px';
+  b.style.left  = (canvas.offsetWidth + 10) + 'px';
+  b.style.top   = y + 'px';
+  b.innerHTML   = `<div class="b-icon">${data.icon}</div><div class="b-text">${data.ar}</div>`;
+  b.dataset.type = data.type;
+  canvas.appendChild(b);
+  state.active[b.id] = { el: b, x: canvas.offsetWidth + 10, y, speed, paused: false };
+  setupDrag(b);
+}
+
+function moveBubbles() {
+  if (state.frozen) return;
+  for (const id in state.active) {
+    const obj = state.active[id];
+    if (obj.paused) continue;
+    obj.x -= obj.speed;
+    obj.el.style.left = obj.x + 'px';
+    if (obj.x + parseInt(obj.el.style.width) < -30) {
+      obj.el.remove(); delete state.active[id];
+    }
+  }
+}
+
+function setupDrag(el) {
+  let dragging = false, offX = 0, offY = 0;
+
+  function onDown(e) {
+    if (state.frozen) return;
+    dragging = true;
+    el.classList.add('dragging');
+    el.style.zIndex = 99;
+    const t = e.touches ? e.touches[0] : e;
+    const r = canvas.getBoundingClientRect();
+    offX = t.clientX - r.left - parseFloat(el.style.left);
+    offY = t.clientY - r.top  - parseFloat(el.style.top);
+    if (state.active[el.id]) state.active[el.id].paused = true;
+    e.preventDefault();
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const t = e.touches ? e.touches[0] : e;
+    const r = canvas.getBoundingClientRect();
+    const nx = t.clientX - r.left - offX;
+    const ny = t.clientY - r.top  - offY;
+    el.style.left = nx + 'px';
+    el.style.top  = ny + 'px';
+    if (state.active[el.id]) { state.active[el.id].x = nx; state.active[el.id].y = ny; }
+    highlightZones(t.clientX, t.clientY);
+    e.preventDefault();
+  }
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    el.style.zIndex = '';
+    clearHighlights();
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    const dropped = getDropZone(t.clientX, t.clientY);
+    if (dropped) evaluate(el, dropped);
+    else if (state.active[el.id]) state.active[el.id].paused = false;
+  }
+
+  el.addEventListener('mousedown',  onDown,  { passive: false });
+  el.addEventListener('touchstart', onDown,  { passive: false });
+  document.addEventListener('mousemove',  onMove);
+  document.addEventListener('touchmove',  onMove, { passive: false });
+  document.addEventListener('mouseup',    onUp);
+  document.addEventListener('touchend',   onUp);
+}
+
+function highlightZones(cx, cy) {
+  ['safe','suspect','danger'].forEach(z => {
+    const el = document.getElementById('zone-' + z);
+    const r  = el.getBoundingClientRect();
+    el.classList.toggle('highlight', cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom);
+  });
+}
+function clearHighlights() {
+  document.querySelectorAll('.zone').forEach(z => z.classList.remove('highlight'));
+}
+function getDropZone(cx, cy) {
+  for (const z of ['safe','suspect','danger']) {
+    const r = document.getElementById('zone-' + z).getBoundingClientRect();
+    if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return z;
+  }
+  return null;
+}
+
+function evaluate(el, droppedZone) {
+  const correct = el.dataset.type === droppedZone;
+  const bRect = el.getBoundingClientRect();
+  const cRect = canvas.getBoundingClientRect();
+  delete state.active[el.id];
+  el.remove();
+
+  showPop(bRect.left - cRect.left + 28, bRect.top - cRect.top + 14,
+          correct ? '✓ صح!' : '✗ خطأ!',
+          correct ? '#22c55e' : '#ef4444');
+
+  state.zoneCounts[droppedZone]++;
+  document.getElementById('cnt-' + droppedZone).textContent = state.zoneCounts[droppedZone];
+
+  if (correct) {
+    state.correct++;
+    document.getElementById('correct-count').textContent = state.correct;
+    if (state.correct >= 10) { setTimeout(endGame, 500); return; }
+  } else {
+    state.wrong++;
+    document.getElementById('wrong-count').textContent = state.wrong;
+    state.lives = Math.max(0, state.lives - 1);
+    document.getElementById('h' + (state.lives + 1)).classList.add('lost');
+    if (state.lives <= 0) { triggerFreeze(el.dataset.type, true); return; }
+    triggerFreeze(el.dataset.type, false);
+  }
+}
+
+function showPop(x, y, txt, color) {
+  const p = document.createElement('div');
+  p.className = 'pop-msg';
+  p.style.cssText = `left:${x}px;top:${y}px;background:${color}22;border:1px solid ${color};color:${color}`;
+  p.textContent = txt;
+  canvas.appendChild(p);
+  setTimeout(() => p.remove(), 1800);
+}
+
+function triggerFreeze(type, gameOver) {
+  state.frozen = true;
+  const msg = FREEZE_MSGS[type];
+  document.getElementById('freeze-icon').textContent = msg.icon;
+  document.getElementById('freeze-text').textContent = msg.text;
+  const overlay = document.getElementById('freeze-overlay');
+  document.getElementById('freeze-sub').innerHTML = gameOver
+    ? '⏹ انتهت اللعبة · Game over'
+    : 'يستأنف النهر خلال <span id="countdown">3</span> ثوانٍ…';
+  overlay.classList.add('active');
+  if (gameOver) { setTimeout(endGame, 2500); return; }
+  let t = 3;
+  document.getElementById('countdown').textContent = t;
+  const iv = setInterval(() => {
+    t--;
+    const el = document.getElementById('countdown');
+    if (el) el.textContent = t;
+    if (t <= 0) { clearInterval(iv); overlay.classList.remove('active'); state.frozen = false; }
+  }, 1000);
+}
+
+function endGame() {
+  clearInterval(state.spawnTimer);
+  clearInterval(state.moveTimer);
+  state.frozen = true;
+  const total = state.correct + state.wrong;
+  const pct   = total ? Math.round((state.correct / total) * 100) : 0;
+  document.getElementById('end-trophy').textContent    = pct >= 80 ? '🏆' : pct >= 50 ? '🌟' : '⭐';
+  document.getElementById('end-score-big').textContent = `${state.correct} / ${total}`;
+  document.getElementById('end-label').textContent     = `دقة ${pct}٪ · ${pct}% accuracy`;
+  document.getElementById('freeze-overlay').classList.remove('active');
+  document.getElementById('end-screen').classList.add('active');
+}
+
+initGame();
+</script>
+</body>
+</html>
